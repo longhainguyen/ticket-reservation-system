@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { TicketStatus } from '../ticket-status.enum';
 
 @Entity()
 export class Ticket {
@@ -14,8 +15,12 @@ export class Ticket {
     @Column()
     quantity: number;
 
-    @Column({ default: 'available' })
-    status: string;
+    @Column({
+        type: 'enum',
+        enum: TicketStatus,
+        default: TicketStatus.AVAILABLE,
+    })
+    status: TicketStatus;
 
     @Column({ nullable: true })
     bookedBy: string;
@@ -23,6 +28,9 @@ export class Ticket {
     @Column({ nullable: true, type: 'timestamp' })
     bookedAt: Date;
 
-    @Column({ nullable: true, type: 'timestamp' })
-    confirmedAt: Date;
+    @CreateDateColumn({ type: 'timestamp' })
+    createdAt: Date;
+
+    @UpdateDateColumn({ type: 'timestamp' })
+    updatedAt: Date;
 }
