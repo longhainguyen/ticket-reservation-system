@@ -1,32 +1,28 @@
+import { Exclude } from 'class-transformer';
+import { UserRole } from 'src/constant/enum/role.enum';
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { TicketStatus } from '../ticket-status.enum';
 
 @Entity()
-export class Ticket {
+export class User {
     @PrimaryGeneratedColumn()
     id: number;
 
     @Column({ unique: true })
-    name: string;
-
-    @Column('decimal')
-    price: number;
+    username: string;
 
     @Column()
-    quantity: number;
+    @Exclude()
+    password: string;
 
     @Column({
         type: 'enum',
-        enum: TicketStatus,
-        default: TicketStatus.AVAILABLE,
+        enum: UserRole,
+        default: UserRole.User,
     })
-    status: TicketStatus;
+    role: UserRole;
 
     @Column({ nullable: true })
-    bookedBy: string;
-
-    @Column({ nullable: true, type: 'timestamp' })
-    bookedAt: Date;
+    refreshToken: string;
 
     @CreateDateColumn({ type: 'timestamp' })
     createdAt: Date;
