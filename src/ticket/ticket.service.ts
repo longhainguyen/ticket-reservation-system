@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Ticket } from './entities/ticket.entity';
 import { CreateTicketDto } from './dto/create-ticket.dto';
+import { TicketStatus } from './ticket-status.enum';
 
 @Injectable()
 export class TicketService {
@@ -12,14 +13,29 @@ export class TicketService {
     ) {}
 
     async create(createTicketDto: CreateTicketDto): Promise<Ticket> {
-        const { name, price, quantity } = createTicketDto;
-
         const newTicket = this.ticketRepository.create({
-            name: name,
-            quantity: quantity,
-            price: price,
+            name: createTicketDto.name,
+            price: createTicketDto.price,
+            type: createTicketDto.type,
         });
 
-        return await this.ticketRepository.save(newTicket);
+        try {
+            return await this.ticketRepository.save(newTicket);
+        } catch (error) {
+            if (error instanceof QueryFailedError && error.message.includes('Duplicate entry')) {
+                throw new ConflictException('Duplicate entry for ticket with the same name and type');
+            }
+            throw error;
+        }
+    }
+
+    async getTicketsByStatus(status: TicketStatus): Promise<Ticket[]> {
+        return this.ticketRepository.find({
+            where: { status: status },
+        });
+    }
+
+    async getAllTickets(): Promise<Ticket[]> {
+        return this.ticketRepository.find();
     }
 }

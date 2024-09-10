@@ -1,19 +1,21 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique, ManyToOne } from 'typeorm';
 import { TicketStatus } from '../ticket-status.enum';
+import { User } from 'src/users/entities/user.entity';
 
 @Entity()
+@Unique(['name', 'type'])
 export class Ticket {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ unique: true })
+    @Column()
     name: string;
+
+    @Column()
+    type: string;
 
     @Column('decimal')
     price: number;
-
-    @Column()
-    quantity: number;
 
     @Column({
         type: 'enum',
@@ -22,8 +24,8 @@ export class Ticket {
     })
     status: TicketStatus;
 
-    @Column({ nullable: true })
-    bookedBy: string;
+    @ManyToOne(() => User, (user) => user.tickets)
+    user: User;
 
     @Column({ nullable: true, type: 'timestamp' })
     bookedAt: Date;

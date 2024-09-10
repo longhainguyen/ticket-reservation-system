@@ -5,9 +5,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from './roles.guard';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
+import { Ticket } from 'src/ticket/entities/ticket.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([User])],
+    imports: [TypeOrmModule.forFeature([User]), TypeOrmModule.forFeature([Ticket])],
     providers: [
         UsersService,
         {
