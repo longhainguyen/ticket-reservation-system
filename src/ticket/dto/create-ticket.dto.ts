@@ -9,7 +9,7 @@ export class CreateTicketDto {
     @Min(0)
     price: number;
 
-    @IsNumber()
-    @Min(1)
-    quantity: number;
+    @IsString()
+    @IsNotEmpty()
+    type: string;
 }
