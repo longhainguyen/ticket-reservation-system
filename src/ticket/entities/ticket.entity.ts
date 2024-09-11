@@ -1,6 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique, ManyToOne } from 'typeorm';
 import { TicketStatus } from '../ticket-status.enum';
 import { User } from 'src/users/entities/user.entity';
+import { Payment } from 'src/payment/entities/payment.entity';
 
 @Entity()
 @Unique(['name', 'type'])
@@ -23,6 +24,9 @@ export class Ticket {
         default: TicketStatus.AVAILABLE,
     })
     status: TicketStatus;
+
+    @ManyToOne(() => Payment, (payment) => payment.tickets)
+    payment: Payment;
 
     @ManyToOne(() => User, (user) => user.tickets)
     user: User;
