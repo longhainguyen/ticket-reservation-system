@@ -8,6 +8,8 @@ import { dataSourceOptions } from 'db/data-source';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PaymentModule } from './payment/payment.module';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './auth/auth.guard';
 
 @Module({
     imports: [
@@ -22,6 +24,12 @@ import { PaymentModule } from './payment/payment.module';
         PaymentModule,
     ],
     controllers: [AppController],
-    providers: [AppService],
+    providers: [
+        AppService,
+        {
+            provide: APP_GUARD,
+            useClass: AuthGuard,
+        },
+    ],
 })
 export class AppModule {}

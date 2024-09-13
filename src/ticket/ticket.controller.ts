@@ -1,10 +1,11 @@
-import { Controller, Post, Body, Get, Param, Request } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Request, Query } from '@nestjs/common';
 import { TicketService } from './ticket.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { Roles } from 'src/decorators/roles.decorator';
 import { UserRole } from 'src/constant/enum/role.enum';
 import { Ticket } from './entities/ticket.entity';
 import { TicketStatus } from './ticket-status.enum';
+import { Public } from 'src/decorators/public.decorator';
 
 @Controller('ticket')
 export class TicketController {
@@ -29,5 +30,18 @@ export class TicketController {
     @Post('cancel-ticket/:ticketId')
     async cancelTicket(@Param('ticketId') ticketId: number, @Request() req) {
         return await this.ticketService.cancelTicket(ticketId, req);
+    }
+
+    @Get('available')
+    @Public()
+    async getAvailableTicketsGroupedByName(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
+        const tickets = await this.ticketService.getTicketsGroupedByName(page, limit);
+        return {
+            data: tickets.data,
+            total: tickets.total,
+            page: tickets.page,
+            totalPages: tickets.totalPages,
+            message: 'List of available tickets and remaining number',
+        };
     }
 }

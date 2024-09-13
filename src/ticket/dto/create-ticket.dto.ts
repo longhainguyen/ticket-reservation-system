@@ -11,5 +11,5 @@ export class CreateTicketDto {
 
     @IsString()
     @IsNotEmpty()
-    type: string;
+    seat: string;
 }

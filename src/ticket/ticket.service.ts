@@ -35,7 +35,7 @@ export class TicketService {
         const newTicket = this.ticketRepository.create({
             name: createTicketDto.name,
             price: createTicketDto.price,
-            type: createTicketDto.type,
+            seat: createTicketDto.seat,
         });
 
         try {
@@ -143,5 +143,33 @@ export class TicketService {
         } finally {
             await queryRunner.release();
         }
+    }
+
+    async getTicketsGroupedByName(page: number = 1, limit: number = 10) {
+        const offset = (page - 1) * limit;
+
+        const listTicket = await this.ticketRepository
+            .createQueryBuilder('ticket')
+            .select('ticket.name', 'name')
+            .addSelect('ticket.price', 'price')
+            .addSelect('COUNT(ticket.id)', 'availableCount')
+            .where('ticket.status = :status', { status: TicketStatus.AVAILABLE })
+            .groupBy('ticket.name')
+            .skip(offset)
+            .take(limit)
+            .getRawMany();
+
+        const totalGroups = await this.ticketRepository
+            .createQueryBuilder('ticket')
+            .where('ticket.status = :status', { status: TicketStatus.AVAILABLE })
+            .groupBy('ticket.name')
+            .getRawMany();
+
+        return {
+            data: listTicket,
+            total: totalGroups.length,
+            page,
+            totalPages: Math.ceil(totalGroups.length / limit),
+        };
     }
 }

@@ -4,7 +4,7 @@ import { User } from 'src/users/entities/user.entity';
 import { Payment } from 'src/payment/entities/payment.entity';
 
 @Entity()
-@Unique(['name', 'type'])
+@Unique(['name', 'seat'])
 export class Ticket {
     @PrimaryGeneratedColumn()
     id: number;
@@ -13,7 +13,7 @@ export class Ticket {
     name: string;
 
     @Column()
-    type: string;
+    seat: string;
 
     @Column('decimal')
     price: number;
