@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Request } from '@nestjs/common';
 import { TicketService } from './ticket.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { Roles } from 'src/decorators/roles.decorator';
@@ -24,5 +24,10 @@ export class TicketController {
     @Get()
     async getAllTickets(): Promise<Ticket[]> {
         return this.ticketService.getAllTickets();
+    }
+
+    @Post('cancel-ticket/:ticketId')
+    async cancelTicket(@Param('ticketId') ticketId: number, @Request() req) {
+        return await this.ticketService.cancelTicket(ticketId, req);
     }
 }

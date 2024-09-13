@@ -7,7 +7,7 @@ import {
     UpdateDateColumn,
     OneToMany,
     JoinColumn,
-    OneToOne,
+    ManyToOne,
 } from 'typeorm';
 import { PaymentStatus } from '../payment.enum';
 import { User } from 'src/users/entities/user.entity';
@@ -30,7 +30,10 @@ export class Payment {
     @Column({ type: 'timestamp', nullable: true })
     paymentAt: Date;
 
-    @OneToOne(() => User)
+    @Column({ nullable: true })
+    stripePaymentIntentId: string;
+
+    @ManyToOne(() => User)
     @JoinColumn()
     user: User;
 

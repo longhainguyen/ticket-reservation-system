@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, Req } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { Repository } from 'typeorm';
+import { Connection, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Ticket } from 'src/ticket/entities/ticket.entity';
@@ -16,6 +16,8 @@ export class UsersService {
 
         @InjectRepository(Ticket)
         private readonly ticketRepository: Repository<Ticket>,
+
+        private readonly connection: Connection,
     ) {}
 
     async findOne(username: string): Promise<User> {
@@ -47,22 +49,32 @@ export class UsersService {
     }
 
     async bookTicket(ticketId: number, @Req() req): Promise<Ticket> {
-        const user = await this.findOneById(req.user.sub);
+        const queryRunner = this.connection.createQueryRunner();
+        await queryRunner.startTransaction();
 
-        const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+        try {
+            const user = await this.findOneById(req.user.sub);
 
-        if (!ticket) {
-            throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+            const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+
+            if (!ticket) {
+                throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+            }
+
+            if (ticket.status !== TicketStatus.AVAILABLE) {
+                throw new BadRequestException(`Ticket with ID ${ticketId} is not available for booking`);
+            }
+
+            ticket.user = user;
+            ticket.status = TicketStatus.PENDING;
+            ticket.bookedAt = new Date();
+
+            return await this.ticketRepository.save(ticket);
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
         }
-
-        if (ticket.status !== TicketStatus.AVAILABLE) {
-            throw new BadRequestException(`Ticket with ID ${ticketId} is not available for booking`);
-        }
-
-        ticket.user = user;
-        ticket.status = TicketStatus.PENDING;
-        ticket.bookedAt = new Date();
-
-        return await this.ticketRepository.save(ticket);
     }
 }

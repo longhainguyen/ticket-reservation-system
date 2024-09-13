@@ -2,15 +2,7 @@ import { Exclude } from 'class-transformer';
 import { UserRole } from 'src/constant/enum/role.enum';
 import { Payment } from 'src/payment/entities/payment.entity';
 import { Ticket } from 'src/ticket/entities/ticket.entity';
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-    OneToMany,
-    OneToOne,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 
 @Entity()
 export class User {
@@ -38,7 +30,7 @@ export class User {
     @OneToMany(() => Ticket, (ticket) => ticket.user)
     tickets: Ticket[];
 
-    @OneToOne(() => Payment, (payment) => payment.user)
+    @OneToMany(() => Payment, (payment) => payment.user)
     payment: Payment;
 
     @CreateDateColumn({ type: 'timestamp' })

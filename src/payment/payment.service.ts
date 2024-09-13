@@ -8,6 +8,9 @@ import { Ticket } from 'src/ticket/entities/ticket.entity';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus } from './payment.enum';
+import { UsersService } from 'src/users/users.service';
+import { TicketService } from 'src/ticket/ticket.service';
+import { currency } from 'src/constant/const/const';
 
 const configService = new ConfigService();
 
@@ -21,6 +24,10 @@ export class PaymentService {
 
         @InjectRepository(Payment)
         private readonly paymentRepository: Repository<Payment>,
+
+        private readonly usersService: UsersService,
+
+        private readonly ticketService: TicketService,
     ) {
         this.stripe = new Stripe(configService.getOrThrow('STRIPE_SECRET_KEY'), {
             apiVersion: '2024-06-20',
@@ -34,9 +41,16 @@ export class PaymentService {
             throw new Error('No tickets found with the given IDs');
         }
 
+        createPaymentDto.ticketIds.map((ticketId) => {
+            this.ticketService.checkAuthorTicket(ticketId, req.user.sub);
+        });
+
+        const user = await this.usersService.findOneById(+req.user.sub);
+
         const newPayment = this.paymentRepository.create({
             tickets: tickets,
             status: PaymentStatus.PENDING,
+            user: user,
         });
 
         const lineItems = tickets.map((ticket) => {
@@ -46,7 +60,7 @@ export class PaymentService {
 
             return {
                 price_data: {
-                    currency: 'usd',
+                    currency: currency,
                     product_data: {
                         name: ticket.name,
                     },
@@ -83,6 +97,7 @@ export class PaymentService {
             {
                 status: PaymentStatus.PAID,
                 paymentAt: new Date(),
+                stripePaymentIntentId: session.payment_intent as string,
             },
         );
 
