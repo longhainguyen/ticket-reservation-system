@@ -30,6 +30,9 @@ export class Payment {
     @Column({ type: 'timestamp', nullable: true })
     paymentAt: Date;
 
+    @Column()
+    amount: number;
+
     @Column({ nullable: true })
     stripePaymentIntentId: string;
 

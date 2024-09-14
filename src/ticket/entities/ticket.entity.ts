@@ -1,15 +1,5 @@
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-    Unique,
-    ManyToOne,
-    OneToMany,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique, OneToMany } from 'typeorm';
 import { TicketStatus } from '../ticket-status.enum';
-import { User } from 'src/users/entities/user.entity';
 import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
 
 @Entity()
@@ -36,9 +26,6 @@ export class Ticket {
 
     @OneToMany(() => PaymentTicket, (paymentTicket) => paymentTicket.ticket)
     paymentTickets: PaymentTicket[];
-
-    @ManyToOne(() => User, (user) => user.tickets)
-    user: User;
 
     @Column({ nullable: true, type: 'timestamp' })
     bookedAt: Date;

@@ -6,9 +6,11 @@ import { RolesGuard } from './roles.guard';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Ticket } from 'src/ticket/entities/ticket.entity';
+import { Payment } from 'src/payment/entities/payment.entity';
+import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([User]), TypeOrmModule.forFeature([Ticket])],
+    imports: [TypeOrmModule.forFeature([User, Payment, PaymentTicket, Ticket])],
     providers: [
         UsersService,
         {

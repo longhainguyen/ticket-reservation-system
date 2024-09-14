@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Req } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Req } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { TicketStatus } from 'src/ticket/ticket-status.enum';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -40,22 +40,29 @@ export class PaymentService {
     }
 
     async create(createPaymentDto: CreatePaymentDto, @Req() req) {
-        const tickets = await this.ticketRepository.findBy({ id: In(createPaymentDto.ticketIds) });
+        console.log(createPaymentDto.paymentId);
 
-        if (tickets.length === 0) {
-            throw new Error('No tickets found with the given IDs');
-        }
-
-        for (const ticketId of createPaymentDto.ticketIds) {
-            await this.ticketService.checkAuthorTicket(ticketId, req.user.sub);
-        }
-
-        const user = await this.usersService.findOneById(+req.user.sub);
-
-        const newPayment = this.paymentRepository.create({
-            status: PaymentStatus.PENDING,
-            user: user,
+        const payment = await this.paymentRepository.findOne({
+            where: {
+                id: createPaymentDto.paymentId,
+            },
+            relations: {
+                paymentTickets: {
+                    ticket: true,
+                },
+            },
         });
+
+        if (!payment) {
+            throw new NotFoundException('Payment not found');
+        }
+
+        if (payment.status === PaymentStatus.FAILED) {
+            throw new BadRequestException('Payment has expired or failed');
+        }
+
+        const ticketIds = payment.paymentTickets.map((paymentTicket) => paymentTicket.ticket.id);
+        const tickets = payment.paymentTickets.map((paymentTicket) => paymentTicket.ticket);
 
         const lineItems = tickets.map((ticket) => {
             if (ticket.status === TicketStatus.PENDING) {
@@ -76,8 +83,6 @@ export class PaymentService {
             }
         });
 
-        const payment = await this.paymentRepository.save(newPayment);
-
         const session = await this.stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             mode: 'payment',
@@ -86,7 +91,7 @@ export class PaymentService {
             cancel_url: `http://localhost:3000/payment/cancel`,
             metadata: {
                 userId: req.user.sub,
-                ticketIds: createPaymentDto.ticketIds.join(','),
+                ticketIds: ticketIds.join(','),
                 paymentId: payment.id,
             },
         });

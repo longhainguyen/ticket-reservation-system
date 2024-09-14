@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     ConflictException,
     ForbiddenException,
     Injectable,
@@ -19,6 +18,8 @@ import { percentRefund, timeCloseBooking } from 'src/constant/const/const';
 import { CancelTicketDto } from './dto/cancel-ticket.dto';
 import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
 import { PaymentTicketStatus } from 'src/constant/enum/payment-ticket.enum';
+import { Payment } from 'src/payment/entities/payment.entity';
+import { PaymentStatus } from 'src/payment/payment.enum';
 
 const configService = new ConfigService();
 @Injectable()
@@ -29,6 +30,9 @@ export class TicketService {
         private readonly ticketRepository: Repository<Ticket>,
 
         private readonly connection: Connection,
+
+        @InjectRepository(Payment)
+        private readonly paymentRepository: Repository<Payment>,
 
         @InjectRepository(PaymentTicket)
         private readonly paymentTicketRepository: Repository<PaymentTicket>,
@@ -70,34 +74,38 @@ export class TicketService {
         const now = new Date();
         const fiveMinutesAgo = new Date(now.getTime() - timeCloseBooking * 60 * 1000);
 
-        const pendingTickets = await this.ticketRepository.find({
-            where: {
-                status: TicketStatus.PENDING,
-                bookedAt: LessThan(fiveMinutesAgo),
-            },
-        });
+        const [pendingTickets, expiredPayments] = await Promise.all([
+            this.ticketRepository.find({
+                where: {
+                    status: TicketStatus.PENDING,
+                    bookedAt: LessThan(fiveMinutesAgo),
+                },
+            }),
+            this.paymentRepository.find({
+                where: {
+                    status: PaymentStatus.PENDING,
+                    createdAt: LessThan(fiveMinutesAgo),
+                },
+            }),
+        ]);
 
-        for (const ticket of pendingTickets) {
-            ticket.status = TicketStatus.AVAILABLE;
-            ticket.bookedAt = null;
-            ticket.user = null;
-            await this.ticketRepository.save(ticket);
+        // Cập nhật trạng thái payments
+        if (expiredPayments.length > 0) {
+            await this.paymentRepository.update(
+                { id: In(expiredPayments.map((payment) => payment.id)) },
+                { status: PaymentStatus.FAILED },
+            );
         }
-    }
 
-    async checkAuthorTicket(ticketId: number, userId: number) {
-        const ticket = await this.ticketRepository.findOne({
-            where: {
-                id: ticketId,
-            },
-
-            relations: {
-                user: true,
-            },
-        });
-
-        if (!ticket.user || ticket.user.id !== userId) {
-            throw new ForbiddenException(`You are not authorized with ticket ${ticket.name} ${ticket.seat}`);
+        // Cập nhật trạng thái tickets
+        if (pendingTickets.length > 0) {
+            await this.ticketRepository.update(
+                { id: In(pendingTickets.map((ticket) => ticket.id)) },
+                {
+                    status: TicketStatus.AVAILABLE,
+                    bookedAt: null,
+                },
+            );
         }
     }
 
@@ -107,27 +115,35 @@ export class TicketService {
                 ticket: {
                     id: In(cancelTicketDto.ticketIds),
                 },
-            },
-            relations: {
-                payment: true,
-                ticket: {
-                    user: true,
+
+                payment: {
+                    id: cancelTicketDto.paymentId,
                 },
             },
+            relations: {
+                payment: {
+                    user: true,
+                },
+                ticket: true,
+            },
         });
+
+        const payment = await this.paymentRepository.findOne({
+            where: {
+                id: cancelTicketDto.paymentId,
+            },
+        });
+
+        if (!payment || payment.status !== PaymentStatus.SUCCESS) {
+            throw new NotFoundException('Payment not found or expire or faild');
+        }
 
         if (paymentTickets.length === 0) {
             throw new NotFoundException('Ticket not found');
         }
 
-        // Kiểm tra nếu tất cả tickets thuộc cùng một payment
-        const uniquePaymentIds = [...new Set(paymentTickets.map((pt) => pt.payment.id))];
-        if (uniquePaymentIds.length > 1) {
-            throw new BadRequestException('Tickets do not belong to the same payment.');
-        }
-
         // Kiểm tra quyền hủy của user cho tất cả tickets
-        const isAuthorized = paymentTickets.every((pt) => pt.ticket.user?.id === req.user.sub);
+        const isAuthorized = paymentTickets.every((pt) => pt.payment.user?.id === req.user.sub);
         if (!isAuthorized) {
             throw new ForbiddenException('You are not authorized to cancel these tickets');
         }
@@ -142,7 +158,6 @@ export class TicketService {
                 {
                     status: TicketStatus.AVAILABLE,
                     bookedAt: null,
-                    user: null,
                 },
             );
 
