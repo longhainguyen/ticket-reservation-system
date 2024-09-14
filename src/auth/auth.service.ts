@@ -3,6 +3,9 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from 'src/users/entities/user.entity';
 
 const configService = new ConfigService();
 
@@ -11,6 +14,9 @@ export class AuthService {
     constructor(
         private usersService: UsersService,
         private jwtService: JwtService,
+
+        @InjectRepository(User)
+        private readonly userRepository: Repository<User>,
     ) {}
 
     async signIn(username: string, pass: string): Promise<{ access_token: string; refresh_token: string }> {
@@ -46,7 +52,12 @@ export class AuthService {
                 secret: configService.getOrThrow('JWT_REFRESH_KEY'),
             });
 
-            const user = await this.usersService.findOneById(payload.sub);
+            const user = await this.userRepository.findOne({
+                where: {
+                    id: payload.sub,
+                },
+            });
+
             if (!user || user.refreshToken !== refreshToken) {
                 throw new UnauthorizedException();
             }

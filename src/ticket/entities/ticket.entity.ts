@@ -1,7 +1,16 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique, ManyToOne } from 'typeorm';
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    CreateDateColumn,
+    UpdateDateColumn,
+    Unique,
+    ManyToOne,
+    OneToMany,
+} from 'typeorm';
 import { TicketStatus } from '../ticket-status.enum';
 import { User } from 'src/users/entities/user.entity';
-import { Payment } from 'src/payment/entities/payment.entity';
+import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
 
 @Entity()
 @Unique(['name', 'seat'])
@@ -25,8 +34,8 @@ export class Ticket {
     })
     status: TicketStatus;
 
-    @ManyToOne(() => Payment, (payment) => payment.tickets)
-    payment: Payment;
+    @OneToMany(() => PaymentTicket, (paymentTicket) => paymentTicket.ticket)
+    paymentTickets: PaymentTicket[];
 
     @ManyToOne(() => User, (user) => user.tickets)
     user: User;

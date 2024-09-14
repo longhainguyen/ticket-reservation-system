@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     ConflictException,
     ForbiddenException,
     Injectable,
@@ -76,7 +75,6 @@ export class TicketService {
             ticket.status = TicketStatus.AVAILABLE;
             ticket.bookedAt = null;
             ticket.user = null;
-            ticket.payment = null;
             await this.ticketRepository.save(ticket);
         }
     }
@@ -92,8 +90,8 @@ export class TicketService {
             },
         });
 
-        if (ticket.user.id !== userId) {
-            throw new ForbiddenException('You are not authorized to cancel this ticket');
+        if (!ticket.user || ticket.user.id !== userId) {
+            throw new ForbiddenException(`You are not authorized with ticket ${ticket.name} ${ticket.seat}`);
         }
     }
 
@@ -104,7 +102,6 @@ export class TicketService {
             },
 
             relations: {
-                payment: true,
                 user: true,
             },
         });
@@ -119,11 +116,6 @@ export class TicketService {
             }
         });
 
-        const paymentIntentIds = new Set(tickets.map((ticket) => ticket.payment.stripePaymentIntentId));
-        if (paymentIntentIds.size !== 1) {
-            throw new BadRequestException('Tickets must be associated with the same payment intent');
-        }
-
         const queryRunner = this.connection.createQueryRunner();
         await queryRunner.startTransaction();
 
@@ -133,7 +125,6 @@ export class TicketService {
                     id: In(cancelTicketDto.ticketIds),
                 },
                 {
-                    payment: null,
                     status: TicketStatus.AVAILABLE,
                     bookedAt: null,
                 },
@@ -144,7 +135,7 @@ export class TicketService {
             }, 0);
 
             const refund = await this.stripe.refunds.create({
-                payment_intent: tickets[0].payment.stripePaymentIntentId,
+                payment_intent: '',
                 amount: totalAmountToRefund * percentRefund,
             });
 
