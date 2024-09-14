@@ -4,7 +4,9 @@ import { AuthService } from './auth.service';
 import { SignInDto } from './dto/sign-in-dto';
 import { Public } from 'src/decorators/public.decorator';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
     constructor(private authService: AuthService) {}
@@ -12,6 +14,8 @@ export class AuthController {
     @Public()
     @HttpCode(HttpStatus.OK)
     @Post('login')
+    @ApiOperation({ summary: 'Login' })
+    @ApiConsumes('application/x-www-form-urlencoded')
     signIn(@Body() signInDto: SignInDto) {
         return this.authService.signIn(signInDto.username, signInDto.password);
     }

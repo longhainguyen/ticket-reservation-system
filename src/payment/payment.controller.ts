@@ -5,9 +5,11 @@ import { Public } from 'src/decorators/public.decorator';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
 import RequestWithRawBody from 'src/middleware/requestWithRawBody.interface';
+import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 const configService = new ConfigService();
 
+@ApiTags('payments')
 @Controller('payment')
 export class PaymentController {
     private stripe: Stripe;
@@ -18,6 +20,8 @@ export class PaymentController {
     }
 
     @Post()
+    @ApiOperation({ summary: 'Create a new payment - confirm booking ticket' })
+    @ApiConsumes('application/x-www-form-urlencoded')
     async create(@Body() createPaymentDto: CreatePaymentDto, @Request() req) {
         const sessionUrl = await this.paymentService.create(createPaymentDto, req);
         return { url: sessionUrl };
