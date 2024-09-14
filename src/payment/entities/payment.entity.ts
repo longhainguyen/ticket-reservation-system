@@ -1,4 +1,3 @@
-import { Ticket } from 'src/ticket/entities/ticket.entity';
 import {
     Entity,
     Column,
@@ -9,16 +8,17 @@ import {
     JoinColumn,
     ManyToOne,
 } from 'typeorm';
-import { PaymentStatus } from '../payment.enum';
 import { User } from 'src/users/entities/user.entity';
+import { PaymentTicket } from './payment-ticket.entity';
+import { PaymentStatus } from '../payment.enum';
 
 @Entity()
 export class Payment {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToMany(() => Ticket, (ticket) => ticket.payment)
-    tickets: Ticket[];
+    @OneToMany(() => PaymentTicket, (paymentTicket) => paymentTicket.payment)
+    paymentTickets: PaymentTicket[];
 
     @Column({
         type: 'enum',

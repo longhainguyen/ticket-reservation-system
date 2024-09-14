@@ -1,7 +1,7 @@
-import { IsNotEmpty, IsNumber } from 'class-validator';
+import { IsArray, IsNotEmpty } from 'class-validator';
 
 export class CancelTicketDto {
-    @IsNumber()
+    @IsArray()
     @IsNotEmpty()
-    ticketId: number;
+    ticketIds: number[];
 }

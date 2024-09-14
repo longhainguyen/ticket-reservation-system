@@ -8,9 +8,10 @@ import { UsersModule } from 'src/users/users.module';
 import { TicketModule } from 'src/ticket/ticket.module';
 import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from 'src/users/roles.guard';
+import { PaymentTicket } from './entities/payment-ticket.entity';
 
 @Module({
-    imports: [forwardRef(() => TicketModule), UsersModule, TypeOrmModule.forFeature([Ticket, Payment])],
+    imports: [forwardRef(() => TicketModule), UsersModule, TypeOrmModule.forFeature([Ticket, Payment, PaymentTicket])],
     controllers: [PaymentController],
     providers: [
         PaymentService,

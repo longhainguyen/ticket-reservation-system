@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     Injectable,
@@ -7,7 +8,7 @@ import {
     Req,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, QueryFailedError, Repository, Connection } from 'typeorm';
+import { LessThan, QueryFailedError, Repository, Connection, In } from 'typeorm';
 import { Ticket } from './entities/ticket.entity';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketStatus } from './ticket-status.enum';
@@ -15,6 +16,9 @@ import { Cron } from '@nestjs/schedule';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
 import { percentRefund, timeCloseBooking } from 'src/constant/const/const';
+import { CancelTicketDto } from './dto/cancel-ticket.dto';
+import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
+import { PaymentTicketStatus } from 'src/constant/enum/payment-ticket.enum';
 
 const configService = new ConfigService();
 @Injectable()
@@ -25,6 +29,9 @@ export class TicketService {
         private readonly ticketRepository: Repository<Ticket>,
 
         private readonly connection: Connection,
+
+        @InjectRepository(PaymentTicket)
+        private readonly paymentTicketRepository: Repository<PaymentTicket>,
     ) {
         this.stripe = new Stripe(configService.getOrThrow('STRIPE_SECRET_KEY'), {
             apiVersion: '2024-06-20',
@@ -74,7 +81,6 @@ export class TicketService {
             ticket.status = TicketStatus.AVAILABLE;
             ticket.bookedAt = null;
             ticket.user = null;
-            ticket.payment = null;
             await this.ticketRepository.save(ticket);
         }
     }
@@ -90,46 +96,75 @@ export class TicketService {
             },
         });
 
-        if (ticket.user.id !== userId) {
-            throw new ForbiddenException('You are not authorized to cancel this ticket');
+        if (!ticket.user || ticket.user.id !== userId) {
+            throw new ForbiddenException(`You are not authorized with ticket ${ticket.name} ${ticket.seat}`);
         }
     }
 
-    async cancelTicket(ticketId: number, @Req() req) {
-        const ticket = await this.ticketRepository.findOne({
+    async cancelTicket(cancelTicketDto: CancelTicketDto, @Req() req) {
+        const paymentTickets = await this.paymentTicketRepository.find({
             where: {
-                id: ticketId,
+                ticket: {
+                    id: In(cancelTicketDto.ticketIds),
+                },
             },
-
             relations: {
                 payment: true,
-                user: true,
+                ticket: {
+                    user: true,
+                },
             },
         });
 
-        if (!ticket) {
+        if (paymentTickets.length === 0) {
             throw new NotFoundException('Ticket not found');
         }
 
-        if (ticket.user.id !== req.user.sub) {
-            throw new ForbiddenException('You are not authorized to cancel this ticket');
+        // Kiểm tra nếu tất cả tickets thuộc cùng một payment
+        const uniquePaymentIds = [...new Set(paymentTickets.map((pt) => pt.payment.id))];
+        if (uniquePaymentIds.length > 1) {
+            throw new BadRequestException('Tickets do not belong to the same payment.');
+        }
+
+        // Kiểm tra quyền hủy của user cho tất cả tickets
+        const isAuthorized = paymentTickets.every((pt) => pt.ticket.user?.id === req.user.sub);
+        if (!isAuthorized) {
+            throw new ForbiddenException('You are not authorized to cancel these tickets');
         }
 
         const queryRunner = this.connection.createQueryRunner();
         await queryRunner.startTransaction();
 
         try {
-            await this.ticketRepository.update(ticketId, {
-                payment: null,
-                status: TicketStatus.AVAILABLE,
-                bookedAt: null,
-            });
+            // Cập nhật trạng thái của các tickets thành AVAILABLE và gán lại user
+            await this.ticketRepository.update(
+                { id: In(cancelTicketDto.ticketIds) },
+                {
+                    status: TicketStatus.AVAILABLE,
+                    bookedAt: null,
+                    user: null,
+                },
+            );
 
+            // Cập nhật trạng thái của PaymentTicket thành REFUND
+            await this.paymentTicketRepository.update(
+                { ticket: { id: In(cancelTicketDto.ticketIds) } },
+                { status: PaymentTicketStatus.REFUND },
+            );
+
+            // Tính tổng số tiền cần hoàn lại
+            const totalAmountToRefund = paymentTickets.reduce(
+                (total, paymentTicket) => total + Math.round(paymentTicket.ticket.price * 100),
+                0,
+            );
+
+            // Thực hiện hoàn tiền
             const refund = await this.stripe.refunds.create({
-                payment_intent: ticket.payment.stripePaymentIntentId,
-                amount: Math.round(ticket.price * 100 * percentRefund), // hoàn lại 90% giá vé
+                payment_intent: paymentTickets[0].payment.stripePaymentIntentId,
+                amount: totalAmountToRefund * percentRefund,
             });
 
+            // Kiểm tra kết quả hoàn tiền
             if (refund.status === 'succeeded') {
                 await queryRunner.commitTransaction();
                 return { message: 'Ticket canceled and refund processed successfully' };

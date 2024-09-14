@@ -1,4 +1,4 @@
-import { Injectable, Req } from '@nestjs/common';
+import { ConflictException, Injectable, Req } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { TicketStatus } from 'src/ticket/ticket-status.enum';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -7,10 +7,12 @@ import { In, Repository } from 'typeorm';
 import { Ticket } from 'src/ticket/entities/ticket.entity';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus } from './payment.enum';
 import { UsersService } from 'src/users/users.service';
 import { TicketService } from 'src/ticket/ticket.service';
 import { currency } from 'src/constant/const/const';
+import { PaymentTicket } from './entities/payment-ticket.entity';
+import { PaymentTicketStatus } from 'src/constant/enum/payment-ticket.enum';
+import { PaymentStatus } from './payment.enum';
 
 const configService = new ConfigService();
 
@@ -28,6 +30,9 @@ export class PaymentService {
         private readonly usersService: UsersService,
 
         private readonly ticketService: TicketService,
+
+        @InjectRepository(PaymentTicket)
+        private readonly paymentTicketRepository: Repository<PaymentTicket>,
     ) {
         this.stripe = new Stripe(configService.getOrThrow('STRIPE_SECRET_KEY'), {
             apiVersion: '2024-06-20',
@@ -41,33 +46,34 @@ export class PaymentService {
             throw new Error('No tickets found with the given IDs');
         }
 
-        createPaymentDto.ticketIds.map((ticketId) => {
-            this.ticketService.checkAuthorTicket(ticketId, req.user.sub);
-        });
+        for (const ticketId of createPaymentDto.ticketIds) {
+            await this.ticketService.checkAuthorTicket(ticketId, req.user.sub);
+        }
 
         const user = await this.usersService.findOneById(+req.user.sub);
 
         const newPayment = this.paymentRepository.create({
-            tickets: tickets,
             status: PaymentStatus.PENDING,
             user: user,
         });
 
         const lineItems = tickets.map((ticket) => {
-            if (ticket.status !== TicketStatus.PENDING) {
-                throw new Error(`Ticket ${ticket.name} is already booked`);
-            }
-
-            return {
-                price_data: {
-                    currency: currency,
-                    product_data: {
-                        name: ticket.name,
+            if (ticket.status === TicketStatus.PENDING) {
+                return {
+                    price_data: {
+                        currency: currency,
+                        product_data: {
+                            name: ticket.name,
+                        },
+                        unit_amount: Math.round(Number(ticket.price) * 100),
                     },
-                    unit_amount: Math.round(Number(ticket.price) * 100),
-                },
-                quantity: 1,
-            };
+                    quantity: 1,
+                };
+            } else {
+                throw new ConflictException(
+                    `Seart ${ticket.seat} of Ticket ${ticket.name} is already booked or not available`,
+                );
+            }
         });
 
         const payment = await this.paymentRepository.save(newPayment);
@@ -79,9 +85,9 @@ export class PaymentService {
             success_url: `http://localhost:3000/payment/success`,
             cancel_url: `http://localhost:3000/payment/cancel`,
             metadata: {
-                paymentId: payment.id,
                 userId: req.user.sub,
                 ticketIds: createPaymentDto.ticketIds.join(','),
+                paymentId: payment.id,
             },
         });
 
@@ -91,13 +97,15 @@ export class PaymentService {
     async handleSuccessfulPayment(session: Stripe.Checkout.Session) {
         const ticketIds = session.metadata.ticketIds.split(',');
         const paymentId = session.metadata.paymentId;
+        console.log(session.metadata);
 
+        // customer_details
         await this.paymentRepository.update(
             { id: +paymentId },
             {
-                status: PaymentStatus.PAID,
                 paymentAt: new Date(),
                 stripePaymentIntentId: session.payment_intent as string,
+                status: PaymentStatus.SUCCESS,
             },
         );
 
@@ -108,6 +116,19 @@ export class PaymentService {
                 bookedAt: new Date(),
             },
         );
+
+        const payment = await this.paymentRepository.findOneBy({ id: +paymentId });
+
+        const tickets = await this.ticketRepository.findBy({ id: In(ticketIds) });
+
+        for (const ticket of tickets) {
+            const newPaymentTicket = this.paymentTicketRepository.create({
+                payment,
+                ticket,
+                status: PaymentTicketStatus.PAID,
+            });
+            await this.paymentTicketRepository.save(newPaymentTicket);
+        }
     }
 
     async handleFailedPayment(paymentIntent: Stripe.PaymentIntent) {

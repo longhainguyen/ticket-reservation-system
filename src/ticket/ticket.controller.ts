@@ -6,6 +6,7 @@ import { UserRole } from 'src/constant/enum/role.enum';
 import { Ticket } from './entities/ticket.entity';
 import { TicketStatus } from './ticket-status.enum';
 import { Public } from 'src/decorators/public.decorator';
+import { CancelTicketDto } from './dto/cancel-ticket.dto';
 
 @Controller('ticket')
 export class TicketController {
@@ -27,9 +28,9 @@ export class TicketController {
         return this.ticketService.getAllTickets();
     }
 
-    @Post('cancel-ticket/:ticketId')
-    async cancelTicket(@Param('ticketId') ticketId: number, @Request() req) {
-        return await this.ticketService.cancelTicket(ticketId, req);
+    @Post('cancel-ticket')
+    async cancelTicket(@Body() ticketIds: CancelTicketDto, @Request() req) {
+        return await this.ticketService.cancelTicket(ticketIds, req);
     }
 
     @Get('available')
