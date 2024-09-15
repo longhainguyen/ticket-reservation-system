@@ -2,9 +2,16 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import rawBodyMiddleware from './middleware/raw-body.middleware';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+    app.useGlobalPipes(
+        new ValidationPipe({
+            transform: true,
+            whitelist: true,
+        }),
+    );
     app.use(rawBodyMiddleware());
 
     const config = new DocumentBuilder()
@@ -25,6 +32,7 @@ async function bootstrap() {
         .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api', app, document);
+    app.enableCors();
     await app.listen(3000);
 }
 bootstrap();

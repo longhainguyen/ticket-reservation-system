@@ -7,10 +7,11 @@ import { Ticket } from './entities/ticket.entity';
 import { TicketStatus } from './ticket-status.enum';
 import { Public } from 'src/decorators/public.decorator';
 import { CancelTicketDto } from './dto/cancel-ticket.dto';
-import { ApiConsumes, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('tickets')
 @Controller('ticket')
+@ApiBearerAuth('JWT-auth')
 export class TicketController {
     constructor(private readonly ticketService: TicketService) {}
 

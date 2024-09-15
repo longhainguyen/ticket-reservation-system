@@ -8,9 +8,15 @@ import { User } from './entities/user.entity';
 import { Ticket } from 'src/ticket/entities/ticket.entity';
 import { Payment } from 'src/payment/entities/payment.entity';
 import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
+import { BullModule } from '@nestjs/bull';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([User, Payment, PaymentTicket, Ticket])],
+    imports: [
+        BullModule.registerQueue({
+            name: 'book-ticket-queue',
+        }),
+        TypeOrmModule.forFeature([User, Payment, PaymentTicket, Ticket]),
+    ],
     providers: [
         UsersService,
         {

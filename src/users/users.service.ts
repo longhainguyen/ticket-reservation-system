@@ -12,10 +12,14 @@ import { PaymentTicket } from 'src/payment/entities/payment-ticket.entity';
 import { PaymentStatus } from 'src/payment/payment.enum';
 import { PaymentTicketStatus } from 'src/constant/enum/payment-ticket.enum';
 import { BookTicketDto } from './dto/book-ticket.dto';
+import { Queue } from 'bull';
+import { InjectQueue } from '@nestjs/bull';
 
 @Injectable()
 export class UsersService {
     constructor(
+        @InjectQueue('book-ticket-queue') private readonly bookTicketQueue: Queue,
+
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
 
@@ -36,15 +40,22 @@ export class UsersService {
     }
 
     async create(createUserDto: CreateUserDto): Promise<User> {
-        const salt = await bcrypt.genSalt();
-        const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
+        try {
+            const salt = await bcrypt.genSalt();
+            const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
 
-        const newUser = this.userRepository.create({
-            username: createUserDto.username,
-            password: hashedPassword,
-        });
+            const newUser = this.userRepository.create({
+                username: createUserDto.username,
+                password: hashedPassword,
+            });
 
-        return await this.userRepository.save(newUser);
+            return await this.userRepository.save(newUser);
+        } catch (error) {
+            if (error.code === 'ER_DUP_ENTRY') {
+                throw new BadRequestException('Username already exists');
+            }
+            throw error;
+        }
     }
 
     async update(id: number, updateData: Partial<User>): Promise<void> {
@@ -129,5 +140,9 @@ export class UsersService {
         } finally {
             await queryRunner.release();
         }
+    }
+
+    async enqueueTicketBooking(bookTicketDto: BookTicketDto, @Req() req) {
+        await this.bookTicketQueue.add('book-ticket', { bookTicketDto, req });
     }
 }
