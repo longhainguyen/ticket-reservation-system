@@ -10,6 +10,10 @@ import { UsersModule } from './users/users.module';
 import { PaymentModule } from './payment/payment.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './auth/auth.guard';
+import { BullModule } from '@nestjs/bull';
+import { ConfigService } from '@nestjs/config';
+
+const configService = new ConfigService();
 
 @Module({
     imports: [
@@ -22,6 +26,12 @@ import { AuthGuard } from './auth/auth.guard';
         AuthModule,
         UsersModule,
         PaymentModule,
+        BullModule.forRoot({
+            redis: {
+                host: configService.getOrThrow('REDIS_HOST'),
+                port: configService.getOrThrow('REDIS_PORT'),
+            },
+        }),
     ],
     controllers: [AppController],
     providers: [
